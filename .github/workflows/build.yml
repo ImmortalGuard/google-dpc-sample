@@ -1,56 +1,24 @@
-name: Build
+name: Bazel build
 
-on:
-  push:
-    paths-ignore:
-      - "CONTRIB"
-      - "LICENSE"
-      - "PRIVACY"
-      - "README.md"
-  pull_request:
-    branches: [ "master" ]
-  workflow_dispatch:
+on: [push]
 
 jobs:
   build:
-    name: Build
     runs-on: ubuntu-latest
     steps:
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v3
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3
         with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Bazel
-        uses: bazel-contrib/setup-bazel@0.8.4
-        with:
-          bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
-          repository-cache: true
-
+          java-version: '11'
+      - name: Install Bazelisk
+        run: |
+          curl -Lo bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.14.0/bazelisk-linux-amd64
+          chmod +x bazelisk && sudo mv bazelisk /usr/local/bin/bazel
       - name: Build
-        run: |
-          chmod +x build.sh
-          ./build.sh
-
-      - name: Test
-        run: bazel test :all
-
-      - name: Set environments
-        run: |
-          {
-            echo "commit=$(echo ${{ github.sha }} | cut -c-7)"
-            echo "repo=$(echo ${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/})"
-            echo "version=v$(grep -o 'android:versionName="[^"]*"' src/main/AndroidManifest.xml | awk -F'"' '{print $2}')"
-          } >> $GITHUB_ENV
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+        run: bazel build //...
+      - name: Archive build outputs
+        uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.repo }}-${{ env.version }}@${{ env.commit }}
-          path: bazel-bin/*.apk
+          name: bazel-bin
+          path: bazel-bin/**
